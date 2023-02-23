@@ -10,32 +10,45 @@ namespace Bargreen.API.Controllers
 {
     //TODO-CHALLENGE: Make the methods in this controller follow the async/await pattern
     //TODO-CHALLENGE: Use dotnet core dependency injection to inject the InventoryService
+    
     [Route("api/[controller]")]
     [ApiController]
     public class InventoryController : ControllerBase
     {
+        //add scoped dependency
+        private readonly InventoryService _inventoryService;
+
+        //constructor
+        public InventoryController()
+        {
+            _inventoryService = new InventoryService();
+        }
+
         [Route("InventoryBalances")]
         [HttpGet]
-        public IEnumerable<InventoryBalance> GetInventoryBalances()
+        public async Task<IEnumerable<InventoryBalance>> GetInventoryBalances()
         {
-            var inventoryService = new InventoryService();
-            return inventoryService.GetInventoryBalances();
+            //converted method to async Task and updated method name to return async method with await keyword
+            //var _inventoryService = new InventoryService();
+            return await _inventoryService.GetInventoryBalancesAsync();
         }
 
         [Route("AccountingBalances")]
         [HttpGet]
-        public IEnumerable<AccountingBalance> GetAccountingBalances()
+        public async Task<IEnumerable<AccountingBalance>> GetAccountingBalances()
         {
-            var inventoryService = new InventoryService();
-            return inventoryService.GetAccountingBalances();
+            //converted method to async Task and updated method name to return async method with await keyword
+            //var inventoryService = new InventoryService();
+            return await _inventoryService.GetAccountingBalancesAsync();
         }
 
         [Route("InventoryReconciliation")]
         [HttpGet]
-        public IEnumerable<InventoryReconciliationResult> GetReconciliation()
+        public async Task<IEnumerable<InventoryReconciliationResult>> GetReconciliation()
         {
-            var inventoryService = new InventoryService();
-            return InventoryService.ReconcileInventoryToAccounting(inventoryService.GetInventoryBalances(), inventoryService.GetAccountingBalances());
+            //var inventoryService = new InventoryService();
+            //add await and cast to explicit type
+            return await InventoryService.ReconcileInventoryToAccounting((IEnumerable<InventoryBalance>)_inventoryService.GetInventoryBalancesAsync(), (IEnumerable<AccountingBalance>)_inventoryService.GetAccountingBalancesAsync());
         }
     }
 }

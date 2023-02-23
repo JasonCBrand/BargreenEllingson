@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Bargreen.Services
 {
@@ -17,6 +19,8 @@ namespace Bargreen.Services
         public string WarehouseLocation { get; set; }
         public int QuantityOnHand { get; set; }
         public decimal PricePerItem { get; set; }
+        //add property to make comparison easier
+        public decimal TotalValueOnHand { get; set; }
     }
 
     public class AccountingBalance
@@ -28,58 +32,69 @@ namespace Bargreen.Services
 
     public class InventoryService
     {
-        public IEnumerable<InventoryBalance> GetInventoryBalances()
+        public async Task<IEnumerable<InventoryBalance>> GetInventoryBalancesAsync()
         {
-            return new List<InventoryBalance>()
+            //change list to variable and move return to end of method
+            var inventoryBalances = new List<InventoryBalance>()
             {
                 new InventoryBalance()
                 {
                      ItemNumber = "ABC123",
                      PricePerItem = 7.5M,
                      QuantityOnHand = 312,
-                     WarehouseLocation = "WLA1"
+                     WarehouseLocation = "WLA1",
+                     TotalValueOnHand = 2340M
                 },
                 new InventoryBalance()
                 {
                      ItemNumber = "ABC123",
                      PricePerItem = 7.5M,
                      QuantityOnHand = 146,
-                     WarehouseLocation = "WLA2"
+                     WarehouseLocation = "WLA2",
+                     TotalValueOnHand = 1095M
+
                 },
                 new InventoryBalance()
                 {
                      ItemNumber = "ZZZ99",
                      PricePerItem = 13.99M,
                      QuantityOnHand = 47,
-                     WarehouseLocation = "WLA3"
+                     WarehouseLocation = "WLA3",
+                     TotalValueOnHand = 657.53M
                 },
                 new InventoryBalance()
                 {
                      ItemNumber = "zzz99",
                      PricePerItem = 13.99M,
                      QuantityOnHand = 91,
-                     WarehouseLocation = "WLA4"
+                     WarehouseLocation = "WLA4",
+                     TotalValueOnHand = 1273.09M
                 },
                 new InventoryBalance()
                 {
                      ItemNumber = "xxccM",
                      PricePerItem = 245.25M,
                      QuantityOnHand = 32,
-                     WarehouseLocation = "WLA5"
+                     WarehouseLocation = "WLA5",
+                     TotalValueOnHand = 7848M
                 },
                 new InventoryBalance()
                 {
                      ItemNumber = "xxddM",
                      PricePerItem = 747.47M,
                      QuantityOnHand = 15,
-                     WarehouseLocation = "WLA6"
+                     WarehouseLocation = "WLA6",
+                     TotalValueOnHand = 11212.05M
                 }
             };
+            //change return type to task of our above created list
+            return await Task.FromResult<IEnumerable<InventoryBalance>>(inventoryBalances);
         }
 
-        public IEnumerable<AccountingBalance> GetAccountingBalances()
+        public async Task<IEnumerable<AccountingBalance>> GetAccountingBalancesAsync()
         {
-            return new List<AccountingBalance>()
+            //change list to variable and move return to end of method
+            var accountingBalances = new List<AccountingBalance>()
             {
                 new AccountingBalance()
                 {
@@ -102,12 +117,60 @@ namespace Bargreen.Services
                      TotalInventoryValue = 17.99M
                 }
             };
+            //change return type to task of our above created list
+            return await Task.FromResult<IEnumerable<AccountingBalance>>(accountingBalances);
         }
 
-        public static IEnumerable<InventoryReconciliationResult> ReconcileInventoryToAccounting(IEnumerable<InventoryBalance> inventoryBalances, IEnumerable<AccountingBalance> accountingBalances)
+        public static async Task<IEnumerable<InventoryReconciliationResult>> ReconcileInventoryToAccounting(IEnumerable<InventoryBalance> inventoryBalances, IEnumerable<AccountingBalance> accountingBalances)
         {
             //TODO-CHALLENGE: Compare inventory balances to accounting balances and find differences
-            throw new NotImplementedException();
+
+            //create dictionaries to group the lists by item balances making sure to use ToUpper on the item numbers so case doesnt matter
+            var inventoryDict = inventoryBalances.GroupBy(i => i.ItemNumber.ToUpper(),
+                (k, g) => new { ItemNumber = k, Balances = g.ToList() }).ToDictionary(x => x.ItemNumber, x => x.Balances);
+            var accountingDict = accountingBalances.ToDictionary(x => x.ItemNumber.ToUpper(), x => x.TotalInventoryValue);
+            var result = new List<InventoryReconciliationResult>();
+            //loop through the combined results
+            foreach (var itemNumber in inventoryDict.Keys.Union(accountingDict.Keys))
+            {
+                //if the item exists in inventory list
+                if (inventoryDict.TryGetValue(itemNumber, out var inventoryBalancesForItemNumber))
+                {
+                    var totalValueOnHandInInventory = inventoryBalancesForItemNumber.Sum(x => x.TotalValueOnHand);
+                    //if the item exists in accounting list
+                    if (accountingDict.TryGetValue(itemNumber, out var totalValueInAccountingBalance))
+                    {
+                        result.Add(new InventoryReconciliationResult
+                        {
+                            ItemNumber = itemNumber,
+                            TotalValueOnHandInInventory = totalValueOnHandInInventory,
+                            TotalValueInAccountingBalance = totalValueInAccountingBalance
+                        });
+                    }
+                    //else it doesnt exist so accounting val is 0
+                    else
+                    {
+                        result.Add(new InventoryReconciliationResult
+                        {
+                            ItemNumber = itemNumber,
+                            TotalValueOnHandInInventory = totalValueOnHandInInventory,
+                            TotalValueInAccountingBalance = 0M
+                        });
+                    }
+                }
+                //else it only exists in accounting list so inventory val is 0
+                else if (accountingDict.TryGetValue(itemNumber, out var totalValueInAccountingBalance))
+                {
+                    result.Add(new InventoryReconciliationResult
+                    {
+                        ItemNumber = itemNumber,
+                        TotalValueOnHandInInventory = 0M,
+                        TotalValueInAccountingBalance = totalValueInAccountingBalance
+                    });
+                }
+            }
+            return await Task.FromResult<IEnumerable<InventoryReconciliationResult>>(result);
+
         }
     }
 }
