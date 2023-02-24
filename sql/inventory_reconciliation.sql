@@ -3,7 +3,7 @@ declare @inventory table (
     ItemNumber varchar(50) not null,
     WarehouseLocation varchar(50) not null,
     QuantityOnHand int not null,
-    PricePerItem decimal not null
+    PricePerItem decimal(5,2) not null
 )
 
 --Create a table to hold accounting balances: 
@@ -26,11 +26,32 @@ INSERT INTO @accounting VALUES ('ZZZ99', 1930.62)
 INSERT INTO @accounting VALUES ('xxccM', 7602.75)
 INSERT INTO @accounting VALUES ('fbr77', 17.99)
 
+
+
 --TODO-CHALLENGE: Write a query to reconcile matches/differences between the inventory and accounting tables
-(select ItemNumber from @inventory
-Except
-select ItemNumber from @accounting)
-union all
-(select ItemNumber from @accounting
-Except
-select ItemNumber from @inventory)
+SELECT 
+    COALESCE(inv.ItemNumber, acc.ItemNumber) AS ItemNumber,
+    CAST(ISNULL(inv.InventoryTotal, 0) AS DECIMAL(18, 2)) AS InventoryTotal,
+    CAST(ISNULL(acc.AccountingTotal, 0) AS DECIMAL(18, 2)) AS AccountingTotal
+FROM (
+    SELECT 
+        ItemNumber, 
+        ROUND(SUM(QuantityOnHand * PricePerItem),0) AS InventoryTotal
+    FROM (
+        SELECT DISTINCT ItemNumber, QuantityOnHand, PricePerItem
+        FROM @inventory
+    ) i
+    GROUP BY ItemNumber
+) inv
+FULL OUTER JOIN (
+    SELECT 
+        ItemNumber, 
+        SUM(TotalInventoryValue) AS AccountingTotal
+    FROM (
+        SELECT DISTINCT ItemNumber, TotalInventoryValue FROM @accounting
+    ) a
+    GROUP BY ItemNumber
+) acc ON UPPER(inv.ItemNumber) = UPPER(acc.ItemNumber)
+ORDER BY ItemNumber;
+
+          
